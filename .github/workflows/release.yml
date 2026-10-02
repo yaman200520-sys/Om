@@ -1,3 +1,4 @@
+
 name: Build and Release Om-LifeOS (Windows EXE & Android APK)
 
 on:
@@ -87,8 +88,11 @@ jobs:
           distribution: "zulu"
           java-version: "17"
 
+      # FIX: Avoid deprecated Android SDK 'tools' package
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
 
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
@@ -129,8 +133,10 @@ jobs:
           if [ ! -d "src-tauri/gen/android" ]; then
             bun run tauri android init --ci
           fi
+
           # Re-verify and ensure all permissions in manifest
           node scripts/setup-android-permissions.js
+
           # Build signed/unsigned release APK
           bun run tauri android build --apk --target aarch64-linux-android
 
