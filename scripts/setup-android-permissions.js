@@ -58,13 +58,14 @@ if (fs.existsSync(manifestPath)) {
     );
   }
 
-  // Ensure requestLegacyExternalStorage is in <application>
-  if (!content.includes('android:requestLegacyExternalStorage=')) {
-    content = content.replace(
-      '<application',
-      '<application\n        android:requestLegacyExternalStorage="true"\n
-    );
-  }
+ // Ensure requestLegacyExternalStorage is in <application>
+if (!content.includes('android:requestLegacyExternalStorage=')) {
+  content = content.replace(
+    '<application',
+    `<application
+        android:requestLegacyExternalStorage="true"`
+  );
+}
 
   // Inject permissions if not already present
   for (const perm of PERMISSIONS) {
