@@ -149,7 +149,31 @@ jobs:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
         run: |
           bun run tauri android build --apk --target aarch64
+          
+      - name: Diagnose Android manifest error
+        if: always()
+        shell: bash
+        run: |
+          FILE="src-tauri/gen/android/app/src/main/AndroidManifest.xml"
 
+          echo "========== GENERATED MANIFEST =========="
+          if [ -f "$FILE" ]; then
+            nl -ba "$FILE"
+          else
+            echo "ERROR: AndroidManifest.xml not found"
+          fi
+
+          echo "========== MANIFEST REPORTS =========="
+          find src-tauri/gen/android/app/build \
+            -type f \( -iname '*manifest*' -o -iname '*report*' \) \
+            -print 2>/dev/null || true
+
+          echo "========== GRADLE DETAILED ERROR =========="
+          cd src-tauri/gen/android
+          chmod +x ./gradlew
+          ./gradlew :app:processUniversalReleaseMainManifest \
+            --stacktrace --info --no-daemon || true
+            
       # ==========================================
       # UPLOAD ANDROID APK
       # ==========================================
