@@ -1,0 +1,8 @@
+{
+  "name": "OmOS — Executive Operating System",
+  "description": "Unified personal operating system for project timelines, task genesis, routines, habit architecture, financial mastery, and life strategy.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

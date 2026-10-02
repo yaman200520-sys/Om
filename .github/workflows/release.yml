@@ -1,0 +1,151 @@
+name: Build and Release Om-LifeOS (Windows EXE & Android APK)
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag (e.g. v4.8.4)"
+        required: false
+        default: "v4.8.4"
+
+permissions:
+  contents: write
+
+jobs:
+  # ==========================================
+  # WINDOWS BUILD JOB (.exe / NSIS Installer)
+  # ==========================================
+  windows:
+    name: Build Windows EXE
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build Windows Application
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name || inputs.release_tag || 'v4.8.4' }}
+          releaseName: "Om-LifeOS ${{ github.ref_name || inputs.release_tag || 'v4.8.4' }}"
+          releaseBody: |
+            Om-LifeOS Release ${{ github.ref_name || inputs.release_tag || 'v4.8.4' }}
+
+            ✨ Includes:
+            - Windows Desktop Setup Installer (.exe / NSIS)
+            - Full Local Offline Storage, Snap Layouts & Desktop Alarms
+          releaseDraft: false
+          prerelease: false
+          args: "--target x86_64-pc-windows-msvc"
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Om-LifeOS-Windows-Installer
+          path: |
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+            src-tauri/target/release/*.exe
+          if-no-files-found: warn
+
+  # ==========================================
+  # ANDROID BUILD JOB (.apk Mobile App)
+  # ==========================================
+  android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java (JDK 17)
+        uses: actions/setup-java@v4
+        with:
+          distribution: "zulu"
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r26d
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Rust Toolchain & Android Targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Inject Full Mobile Permissions (Storage, Mic, Camera, Alarms, Notifications)
+        run: node scripts/setup-android-permissions.js
+
+      - name: Build Web Assets
+        run: bun run build
+
+      - name: Build Android APK (Tauri v2)
+        env:
+          NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+        run: |
+          # Initialize Android project if not already present
+          if [ ! -d "src-tauri/gen/android" ]; then
+            bun run tauri android init --ci
+          fi
+          # Re-verify and ensure all permissions in manifest
+          node scripts/setup-android-permissions.js
+          # Build signed/unsigned release APK
+          bun run tauri android build --apk --target aarch64-linux-android
+
+      - name: Upload Android APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Om-LifeOS-Android-APK
+          path: |
+            src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: warn
+
+      - name: Attach APK to GitHub Release (If tagged release)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
