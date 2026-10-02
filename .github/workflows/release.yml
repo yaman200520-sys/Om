@@ -88,7 +88,6 @@ jobs:
           distribution: "zulu"
           java-version: "17"
 
-      # FIX: Avoid deprecated Android SDK 'tools' package
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
         with:
@@ -118,28 +117,42 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Inject Full Mobile Permissions (Storage, Mic, Camera, Alarms, Notifications)
-        run: node scripts/setup-android-permissions.js
-
       - name: Build Web Assets
         run: bun run build
 
+      # ==========================================
+      # REGENERATE ANDROID PROJECT
+      # ==========================================
+      - name: Initialize Android Project
+        env:
+          NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+        run: |
+          # Remove stale generated Android project
+          rm -rf src-tauri/gen/android
+
+          # Generate Android project from current Tauri config
+          bun run tauri android init --ci
+
+      # ==========================================
+      # INJECT ANDROID PERMISSIONS
+      # ==========================================
+      - name: Inject Full Mobile Permissions
+        run: node scripts/setup-android-permissions.js
+
+      # ==========================================
+      # BUILD ANDROID APK
+      # ==========================================
       - name: Build Android APK (Tauri v2)
         env:
           NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
         run: |
-          # Initialize Android project if not already present
-          if [ ! -d "src-tauri/gen/android" ]; then
-            bun run tauri android init --ci
-          fi
-
-          # Re-verify and ensure all permissions in manifest
-          node scripts/setup-android-permissions.js
-
-          # Build signed/unsigned release APK
           bun run tauri android build --apk --target aarch64
 
+      # ==========================================
+      # UPLOAD ANDROID APK
+      # ==========================================
       - name: Upload Android APK Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -148,7 +161,10 @@ jobs:
             src-tauri/gen/android/app/build/outputs/apk/**/*.apk
           if-no-files-found: warn
 
-      - name: Attach APK to GitHub Release (If tagged release)
+      # ==========================================
+      # ATTACH APK TO GITHUB RELEASE
+      # ==========================================
+      - name: Attach APK to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
