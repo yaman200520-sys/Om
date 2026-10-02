@@ -138,7 +138,7 @@ jobs:
           node scripts/setup-android-permissions.js
 
           # Build signed/unsigned release APK
-          bun run tauri android build --apk --target aarch64-linux-android
+          bun run tauri android build --apk --target aarch64
 
       - name: Upload Android APK Artifact
         uses: actions/upload-artifact@v4
