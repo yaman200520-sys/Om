@@ -62,7 +62,7 @@ if (fs.existsSync(manifestPath)) {
   if (!content.includes('android:requestLegacyExternalStorage=')) {
     content = content.replace(
       '<application',
-      '<application\n        android:requestLegacyExternalStorage="true"\n        android:usesCleartextTraffic="true"'
+      '<application\n        android:requestLegacyExternalStorage="true"\n
     );
   }
 
